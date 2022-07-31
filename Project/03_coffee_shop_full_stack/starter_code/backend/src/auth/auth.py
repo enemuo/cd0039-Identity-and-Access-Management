@@ -1,15 +1,16 @@
 from email import header
 import json
 from lib2to3.pgen2 import token
-from flask import request, _request_ctx_stack
+from flask import request, _request_ctx_stack, abort
 from functools import wraps
 from jose import jwt
 from urllib.request import urlopen
+import os
 
 
 AUTH0_DOMAIN = 'coderite.us.auth0.com'
-ALGORITHMS = ['RS256']
-API_AUDIENCE = 'coffee'
+os.environ['ALGORITHMS'] = 'RS256'
+os.environ['API_AUDIENCE'] = 'coffee'
 
 ## AuthError Exception
 '''
@@ -40,28 +41,28 @@ def get_token_auth_header():
             'description': 'Expected an Authorization header'
         }, 401)
 
-        header_start = auth_header.split(' ')
+    header_start = auth_header.split(' ')
 
-        if header_start[0].lower() != 'bearer':
+    if header_start[0].lower() != 'bearer':
+        raise AuthError({
+            'code': 'not valid',
+            'description': 'Authorization need to start with BEARER'
+        })
+
+    elif len(header_start) == 1:
             raise AuthError({
-                'code': 'not valid',
-                'description': 'Authorization need to start with BEARER'
-            })
+            'code': 'not valid',
+            'description': 'Token not present'
+         })
 
-        elif len(header_start) == 1:
-             raise AuthError({
-                'code': 'not valid',
-                'description': 'Token not present'
-            })
+    elif len(header_start) > 2:
+            raise AuthError({
+            'code': 'header not valid',
+            'description': 'Authorization need to be a BEARER token'
+        })  
 
-        elif len(header_start) > 2:
-             raise AuthError({
-                'code': 'header not valid',
-                'description': 'Authorization need to be a BEARER token'
-            })  
-
-        token = header_start[1]
-        return token         
+    token = header_start[1]
+    return token         
 
 '''
 @TODO implement check_permissions(permission, payload) method
@@ -104,7 +105,7 @@ def check_permissions(permission, payload):
 '''
 def verify_decode_jwt(token):
     json_url = urlopen(f"https://{AUTH0_DOMAIN}/.well-known/jwts.json")
-    jwts = json.loads(json_url.read())
+    jwks = json.loads(json_url.read())
 
     unverified_header = jwt.get_unverified_header(token)
 
@@ -183,16 +184,3 @@ def requires_auth(permisson=''):
 
         return wrapper
     return requires_auth_auth_decorator    
-
-@app.route('/headers')
-@requires_auth
-def headers(payload):
-    print(payload)
-    return 'Access Granted'
-
-@app.route('/image')
-@requires_auth
-def image(jwt):
-
-    print(jwt)
-    return 'not implemented'  

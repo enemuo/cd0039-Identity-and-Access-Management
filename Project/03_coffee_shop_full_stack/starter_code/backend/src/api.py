@@ -3,11 +3,13 @@ from flask import Flask, request, jsonify, abort
 from sqlalchemy import exc
 import json
 from flask_cors import CORS
+from flasgger import Swagger
 
 from .database.models import db_drop_and_create_all, setup_db, Drink
 from .auth.auth import AuthError, requires_auth
 
 app = Flask(__name__)
+Swagger(app)
 setup_db(app)
 CORS(app)
 
@@ -28,9 +30,9 @@ db_drop_and_create_all()
     returns status code 200 and json {"success": True, "drinks": drinks} where drinks is the list of drinks
         or appropriate status code indicating reason for failure
 '''
-@app.route('/drinks', method=['GET'])
+@app.route('/drinks', methods=['GET'])
 def get_drinks():
-    if request.method == 'GET':
+    # if request.method == 'GET':
         all_drinks = Drink.query.all()
         drinks = [drink.short() for drink in all_drinks]
         return jsonify({
@@ -46,7 +48,7 @@ def get_drinks():
     returns status code 200 and json {"success": True, "drinks": drinks} where drinks is the list of drinks
         or appropriate status code indicating reason for failure
 '''
-@app.route('/drinks-details', method=['GET'])
+@app.route('/drinks-details', methods=['GET'])
 @requires_auth('get:drinks-detail')
 def get_drinks_detail(payload):
     if request.method == 'GET':
@@ -66,7 +68,7 @@ def get_drinks_detail(payload):
     returns status code 200 and json {"success": True, "drinks": drink} where drink an array containing only the newly created drink
         or appropriate status code indicating reason for failure
 '''
-@app.route('/drinks', method=['POST'])
+@app.route('/drinks', methods=['POST'])
 @requires_auth('post:drinks')
 def post_drinks(payload):
     if request.method == 'POST':
@@ -75,7 +77,8 @@ def post_drinks(payload):
         try:
             recipe = body['recipe']
             if type(recipe) is dict:
-                recipe = [recipe]
+                recipe = body.get('recipe', None)
+                title = body.get('title', None)
 
             title = body['title']
             drink = Drink(title=title, recipe=json.dumps(recipe))
@@ -100,7 +103,7 @@ def post_drinks(payload):
     returns status code 200 and json {"success": True, "drinks": drink} where drink an array containing only the updated drink
         or appropriate status code indicating reason for failure
 '''
-@app.route('/drinks', method=['PATCH'])
+@app.route('/drinks', methods=['PATCH'])
 @requires_auth('patch:drinks')
 def patch_drinks(payload, drink_id):
     if request.method == 'PATCH':
@@ -121,7 +124,7 @@ def patch_drinks(payload, drink_id):
                 drinks.title = title
 
             if recipe != None:
-                drink.recipe = json.dumps(body['recipe'])
+                drink.recipe = recipe if type(recipe) == str else json.dumps(recipe)
 
             drink.update()
 
@@ -145,9 +148,9 @@ def patch_drinks(payload, drink_id):
     returns status code 200 and json {"success": True, "delete": id} where id is the id of the deleted record
         or appropriate status code indicating reason for failure
 '''
-@app.route('/drinks/<int:drink_id>', method=['DELETE'])
+@app.route('/drinks/<int:drink_id>', methods=['DELETE'])
 @requires_auth('delete:drinks')
-def patch_drinks(payload, drink_id):
+def delete_drinks(payload, drink_id):
     if request.method == 'DELETE':
 
         drink = Drink.query.filter(Drink.id==drink_id).one_or_none()
@@ -236,4 +239,4 @@ def unauthorized(error):
                  "success": False,
                  "error": error.status_code,
                  "message": error.error['description']
-                }), 401 
+                }), error.status_code 
